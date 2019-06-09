@@ -1,5 +1,8 @@
 package cn.edu.pku.sei.historytracing.CodeTrace;
 
+import cn.edu.pku.sei.historytracing.entity.HistoryResult;
+import cn.edu.pku.sei.historytracing.entity.IssueResult;
+import javafx.util.Pair;
 import org.eclipse.jdt.core.dom.*;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.ObjectId;
@@ -10,9 +13,21 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.PathFilter;
+import spoon.Launcher;
+import spoon.SpoonAPI;
+import spoon.compiler.SpoonResource;
+import spoon.reflect.declaration.CtMethod;
+import spoon.reflect.visitor.filter.TypeFilter;
+import spoon.support.compiler.VirtualFile;
 
+import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CodeAnalyzer {
     private String code;
@@ -119,24 +134,95 @@ public class CodeAnalyzer {
         }
     }
 
-    public static void main(String args[]){
-        String code = "  public final void setReader(Reader input) {\n" +
-                "    if (input == null) {\n" +
-                "      throw new NullPointerException(\"input must not be null\");\n" +
-                "    } else if (this.input != ILLEGAL_STATE_READER) {\n" +
-                "      throw new IllegalStateException(\"TokenStream contract violation: close() call missing\");\n" +
-                "    }\n" +
-                "    this.inputPending = input;\n" +
-                "    setReaderTestPoint();\n" +
-                "  }";
-        String type="code";
-        try{
-            Repository repository =new FileRepository("D:\\项目源代码\\luceneGIT\\.git");
-            CodeAnalyzer analyzer = new CodeAnalyzer(code,type,repository);
-            System.out.println(analyzer.getFilePath());
-        }catch (Exception e){
-            e.printStackTrace();
+
+
+     static class Myvisitor extends ASTVisitor {
+        private List<String> Methods=new ArrayList<>();
+        private String fileContent=null;
+        public Myvisitor(String fileContent){
+            super();
+            this.fileContent=fileContent;
         }
 
+        public List<String> getMethods(){
+            return this.Methods;
+        }
+
+        public boolean visit(MethodDeclaration node){
+            this.Methods.add(fileContent.substring(node.getStartPosition(),node.getStartPosition()+node.getLength()));
+            return true;
+        }
+    }
+
+    public static class myChange{
+        public int fileChange;
+        public int methodChange;
+        public myChange(int fileChange,int methodChange){
+            this.fileChange=fileChange;
+            this.methodChange=methodChange;
+        }
+    }
+
+
+
+
+
+    public static void main(String args[]){
+        try{
+            Repository repository =new FileRepository("D:\\项目源代码\\luceneGIT\\.git");
+            GitAnalyzer gitAnalyzer=new GitAnalyzer(repository);
+            Ref head = repository.findRef("HEAD");
+            RevWalk walk = new RevWalk(repository);
+            RevCommit Lastcommit = walk.parseCommit(head.getObjectId());
+            RevTree tree = walk.parseTree(Lastcommit.getTree().getId());
+            TreeWalk treeWalk = new TreeWalk(repository);
+            treeWalk.addTree(tree);
+            treeWalk.setRecursive(true);
+            int MethodCnt=0;
+            int fileCnt=0;
+
+            List<myChange>Data=new ArrayList<>();
+
+            FileOutputStream fos=new FileOutputStream(new File("D:\\test.txt"));
+            OutputStreamWriter osw=new OutputStreamWriter(fos, "UTF-8");
+            BufferedWriter  bw=new BufferedWriter(osw);
+            while (treeWalk.next()) {
+                String FilePath=treeWalk.getPathString();
+                ObjectId objectId = treeWalk.getObjectId(0);
+                ObjectLoader loader = repository.open(objectId);
+                String fileContent = new String(loader.getBytes());
+                if(FilePath.endsWith(".java")&&FilePath.startsWith("lucene")) {
+                    fileCnt++;
+           //         System.out.println(treeWalk.getPathString());
+                    List<Pair<ObjectId, Pair<String, String>>>res= gitAnalyzer.getAllCommitModifyAFile(FilePath);
+                    System.out.println(fileCnt);
+                    int fileChange=res.size();
+
+                    ASTParser parser = ASTParser.newParser(AST.JLS10);
+                    parser.setSource(fileContent.toCharArray());
+                    parser.setKind(ASTParser.K_COMPILATION_UNIT);
+                    ASTVisitor codeVisitor=new Myvisitor(fileContent);
+                    CompilationUnit unit=(CompilationUnit)parser.createAST(null);
+                    unit.accept(codeVisitor);
+                    List<String>Methods= ((Myvisitor)(codeVisitor)).getMethods();
+
+                    for(int t=0;t<Methods.size();++t){
+                        MethodCnt++;;
+                        String Content=Methods.get(t);
+                        int MethodChange=new HistoryTrace(new CodeAnalyzer(Content,"Method",repository),"Lucene").TraceResult().size();
+                        String s=fileChange+":"+MethodChange;
+                        bw.write(s+"\t\n");
+                    }
+                //    if(fileCnt>4)break;
+
+                }
+
+            }
+            bw.close();
+            osw.close();
+            fos.close();
+        }catch(Exception e){
+            e.printStackTrace();
+        }
     }
 }

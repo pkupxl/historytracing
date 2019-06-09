@@ -118,7 +118,7 @@ public class HistoryTrace {
         String PreMethodContent=null;
         String MethodSignature=null;
         String MethodName=null;
-
+ //       System.out.println(FilePath);
         try{
             Repository repository = analyzer.getRepository();
             GitAnalyzer gitAnalyzer=new GitAnalyzer(repository);
@@ -170,7 +170,6 @@ public class HistoryTrace {
                                         return super.matches(element)&&element.getPosition().getLine()>=Start &&element.getPosition().getEndLine()<=End;
                                     }
                                 })) {
-                                    System.out.println("找到第一个版本的方法");
                                     MethodContent=meth.toString();
                                     MethodSignature=meth.getSignature();
                                     MethodName=meth.getSimpleName();
@@ -180,7 +179,6 @@ public class HistoryTrace {
                                 break;
                             }
                             PreMethodContent=getPreMethodContent(new String(loader.getBytes()),MethodName,MethodSignature);
-
                             String Message=commit.getFullMessage().split("git-svn-id")[0];
                             Pattern pattern = Pattern.compile(project.toUpperCase()+"-(\\d+):(.*)");
                             Matcher matcher = pattern.matcher(Message);
@@ -189,7 +187,7 @@ public class HistoryTrace {
                             if(matcher.find() && matcher.start()==0){
                                 hasIssue=true;
                                 String issueId = project.toUpperCase()+"-"+matcher.group(1);
-                                issueResult = IssueResult.getIssueResult(issueId);
+                        //        issueResult = IssueResult.getIssueResult(issueId);
                             }
 
                             if(PreMethodContent==null){
@@ -201,7 +199,6 @@ public class HistoryTrace {
                                 String time = TimeStamp2Date(String.valueOf(commit.getCommitTime()));
                                 result.add(new HistoryResult(PreMethodContent, MethodContent, Message,time,null,hasIssue,issueResult));
                             }
-
                             MethodContent=PreMethodContent;
                         }
                     }
@@ -214,7 +211,7 @@ public class HistoryTrace {
         return result;
     }
 
-    public String getPreMethodContent(String content,String methodName,String methodSignature){
+    public  String getPreMethodContent(String content,String methodName,String methodSignature){
         SpoonAPI spoon = new Launcher();
         VirtualFile resource = new VirtualFile(content, "/test");
         ((Launcher) spoon).addInputResource((SpoonResource) resource);
@@ -540,7 +537,7 @@ public class HistoryTrace {
         return result;
     }
 
-    public double getSimilariry(String source, String target) {
+    public static double getSimilariry(String source, String target) {
         source=source.trim();
         target=target.trim();
         char[] sources = source.toCharArray();

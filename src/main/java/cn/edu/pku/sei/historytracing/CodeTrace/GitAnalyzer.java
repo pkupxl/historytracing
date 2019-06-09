@@ -87,7 +87,6 @@ public class GitAnalyzer {
                 boolean signal = false;
                 while(commits.hasNext()){
                     RevCommit commit = commits.next();
-
                     if(commits.hasNext())
                         result.add(new Pair<ObjectId, Pair<String, String>>(commit, new Pair<String, String>(filePath,filePath)));
                     else{
@@ -101,11 +100,9 @@ public class GitAnalyzer {
                         }else{
                             result.add(new Pair<ObjectId, Pair<String, String>>(commit, new Pair<String, String>(oldPath,oldPath)));
                         }
-
                     }
                 }
-                if(!signal)
-                    break;
+                if(!signal) break;
             }
         }catch(Exception e){
             e.printStackTrace();
@@ -243,10 +240,8 @@ public class GitAnalyzer {
             tw.setRecursive(true);
             tw.addTree(repository.resolve(cur.getName() + "^{tree}"));
             tw.addTree(repository.resolve(cur.getName() + "^^{tree}"));
-
             RenameDetector rd = new RenameDetector(repository);
             rd.addAll(DiffEntry.scan(tw));
-
             List<DiffEntry> diffs = rd.compute(tw.getObjectReader(), null);
             for(DiffEntry diff: diffs){
                 if(diff.getScore() >= rd.getRenameScore() && diff.getOldPath().equals(file)){
